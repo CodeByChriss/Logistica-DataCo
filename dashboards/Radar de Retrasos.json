@@ -1,0 +1,1351 @@
+{
+  "datasets": [
+    {
+      "name": "retrasos_categoria_segmento",
+      "displayName": "Retrasos por categoría y segmento",
+      "config": {
+        "source": "SELECT category_name,\n       customer_segment,\n       SUM(lineas) AS lineas,\n       SUM(lineas_tardias) AS lineas_tardias\nFROM logistica_dataco.gold.mart_retraso_categoria_segmento\nGROUP BY category_name, customer_segment\nHAVING SUM(lineas) >= min_lineas",
+        "measures": [
+          {
+            "name": "lineas",
+            "expr": "SUM(source.lineas)",
+            "displayName": "Líneas"
+          },
+          {
+            "name": "lineas_tardias",
+            "expr": "SUM(source.lineas_tardias)",
+            "displayName": "Líneas tardías"
+          },
+          {
+            "displayName": "% de líneas tardías",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            },
+            "name": "pct_tardias",
+            "expr": "SUM(source.lineas_tardias) * 1.0 / NULLIF(SUM(source.lineas), 0)",
+            "comment": "SUM(lineas_tardias)/SUM(lineas) sobre el conjunto filtrado; nunca se promedia el pct_tardias de la tabla origen"
+          },
+          {
+            "name": "num_categorias",
+            "expr": "COUNT(DISTINCT source.category_name)",
+            "displayName": "Nº de categorías"
+          },
+          {
+            "displayName": "Brecha vs media global (p.p.)",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            },
+            "name": "brecha_vs_global",
+            "expr": "(MEASURE(pct_tardias) - ANY_VALUE(pct_global_tardias)) * 100",
+            "comment": "% tardías del grupo menos % tardías global del conjunto filtrado, en puntos porcentuales"
+          }
+        ],
+        "version": "1.1",
+        "dimensions": [
+          {
+            "name": "category_name",
+            "expr": "source.category_name",
+            "displayName": "Categoría"
+          },
+          {
+            "name": "customer_segment",
+            "expr": "source.customer_segment",
+            "displayName": "Segmento de cliente"
+          },
+          {
+            "name": "pct_global_tardias",
+            "expr": "SUM(source.lineas_tardias) OVER () * 1.0 / NULLIF(SUM(source.lineas) OVER (), 0)",
+            "displayName": "% tardías global del conjunto filtrado"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "min_lineas",
+            "dataType": "INT",
+            "default": "0"
+          }
+        ]
+      }
+    },
+    {
+      "name": "umbral_opciones",
+      "displayName": "Opciones de umbral mínimo de líneas",
+      "config": {
+        "version": "1.1",
+        "source": "SELECT explode(array(0, 50, 100, 250, 500, 1000, 2500, 5000)) AS valor_umbral",
+        "dimensions": [
+          {
+            "name": "valor_umbral",
+            "expr": "valor_umbral",
+            "displayName": "Mínimo de líneas"
+          }
+        ]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "name": "a858fb17",
+      "displayName": "Mapa de calor",
+      "layout": [
+        {
+          "widget": {
+            "name": "cabecera",
+            "spec": {
+              "verticalAlign": "center",
+              "version": 1,
+              "widgetType": "text",
+              "encodings": {
+                "text": {
+                  "fields": [],
+                  "lines": [
+                    "## Mapa de calor: dónde se concentran más los retrasos\n",
+                    "Porcentaje de líneas con entrega tardía por categoría de producto y segmento de cliente. El porcentaje se calcula siempre como suma de líneas tardías entre suma de líneas (nunca como media de porcentajes), y la brecha se expresa en puntos porcentuales (p.p.) frente a la media global del conjunto filtrado. Use el umbral de líneas mínimas para descartar grupos con poco volumen y evitar ruido estadístico."
+                  ]
+                }
+              }
+            },
+            "specExtensions": {
+              "widgetBackgroundColor": {
+                "light": "#FFF8EE",
+                "dark": "#221E1A"
+              },
+              "widgetBorderColor": {
+                "light": "#FFF8EE",
+                "dark": "#221E1A"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_lineas",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "retrasos_categoria_segmento",
+                  "fields": [
+                    {
+                      "name": "measure(lineas)",
+                      "expression": "MEASURE(`lineas`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Líneas analizadas"
+              },
+              "sparkChart": {
+                "hide": true
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(lineas)",
+                  "format": {
+                    "abbreviation": "none",
+                    "type": "number-plain"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_pct_tardias",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "retrasos_categoria_segmento",
+                  "fields": [
+                    {
+                      "name": "measure(pct_tardias)",
+                      "expression": "MEASURE(`pct_tardias`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "% de líneas tardías (global)"
+              },
+              "sparkChart": {
+                "hide": true
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(pct_tardias)",
+                  "format": {
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "exact"
+                    },
+                    "type": "number-percent"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_categorias",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "retrasos_categoria_segmento",
+                  "fields": [
+                    {
+                      "name": "measure(num_categorias)",
+                      "expression": "MEASURE(`num_categorias`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Categorías en el análisis"
+              },
+              "sparkChart": {
+                "hide": true
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(num_categorias)",
+                  "format": {
+                    "abbreviation": "none",
+                    "type": "number-plain"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "mapa_calor",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "retrasos_categoria_segmento",
+                  "fields": [
+                    {
+                      "name": "measure(pct_tardias)",
+                      "expression": "MEASURE(`pct_tardias`)"
+                    },
+                    {
+                      "name": "measure(brecha_vs_global)",
+                      "expression": "MEASURE(`brecha_vs_global`)"
+                    },
+                    {
+                      "name": "measure(lineas)",
+                      "expression": "MEASURE(`lineas`)"
+                    },
+                    {
+                      "name": "customer_segment",
+                      "expression": "`customer_segment`"
+                    },
+                    {
+                      "name": "category_name",
+                      "expression": "`category_name`"
+                    }
+                  ],
+                  "cubeGroupingSets": {
+                    "sets": [
+                      {
+                        "fieldNames": [
+                          "customer_segment"
+                        ]
+                      },
+                      {
+                        "fieldNames": [
+                          "category_name"
+                        ]
+                      }
+                    ]
+                  },
+                  "disaggregated": false,
+                  "orders": [
+                    {
+                      "direction": "DESC",
+                      "expression": "MEASURE(`pct_tardias`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "showTitle": true,
+                "title": "Dónde se concentran más los retrasos",
+                "description": "Cada celda muestra el % de líneas tardías de la combinación categoría × segmento; el color va del crema al naranja intenso. En el detalle de cada celda, la brecha frente a la media global en puntos porcentuales y las líneas del grupo."
+              },
+              "version": 3,
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "customer_segment",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Segmento de cliente",
+                  "scale": {
+                    "sort": {
+                      "by": "natural-order"
+                    },
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "category_name",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Categoría",
+                  "scale": {
+                    "categorySize": {
+                      "number": 20,
+                      "type": "number-of-categories"
+                    },
+                    "sort": {
+                      "by": "measure-reversed",
+                      "measure": {
+                        "fieldName": "measure(pct_tardias)"
+                      }
+                    },
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "measure(pct_tardias)",
+                  "legend": {
+                    "title": "% de líneas tardías"
+                  },
+                  "scale": {
+                    "colorRamp": {
+                      "colors": {
+                        "end": "#C2410C",
+                        "start": "#FFE9CC"
+                      },
+                      "mode": "custom-sequential"
+                    },
+                    "type": "quantitative"
+                  }
+                },
+                "label": {
+                  "display": {
+                    "type": "all"
+                  },
+                  "show": true,
+                  "text": {
+                    "fieldName": "measure(pct_tardias)",
+                    "format": {
+                      "decimalPlaces": {
+                        "places": 1,
+                        "type": "exact"
+                      },
+                      "type": "number-percent"
+                    }
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "measure(brecha_vs_global)",
+                    "format": {
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "places": 1,
+                        "type": "exact"
+                      },
+                      "type": "number-plain"
+                    },
+                    "formatTemplate": "{{ @formatted }} p.p."
+                  },
+                  {
+                    "fieldName": "measure(lineas)",
+                    "format": {
+                      "abbreviation": "none",
+                      "type": "number-plain"
+                    }
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 12,
+            "height": 12
+          }
+        },
+        {
+          "widget": {
+            "name": "barras_segmento",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "retrasos_categoria_segmento",
+                  "fields": [
+                    {
+                      "name": "customer_segment",
+                      "expression": "`customer_segment`"
+                    },
+                    {
+                      "name": "category_name",
+                      "expression": "`category_name`"
+                    },
+                    {
+                      "name": "measure(lineas)",
+                      "expression": "MEASURE(`lineas`)"
+                    }
+                  ],
+                  "cubeGroupingSets": {
+                    "sets": [
+                      {
+                        "fieldNames": [
+                          "customer_segment"
+                        ]
+                      },
+                      {
+                        "fieldNames": [
+                          "category_name"
+                        ]
+                      }
+                    ]
+                  },
+                  "disaggregated": false,
+                  "orders": [
+                    {
+                      "direction": "DESC",
+                      "expression": "MEASURE(`lineas`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "showTitle": true,
+                "title": "Cuánto pesa cada segmento en el volumen de líneas",
+                "description": "Volumen de líneas por categoría, apilado por segmento de cliente, para contextualizar el peso de cada segmento en los retrasos."
+              },
+              "version": 3,
+              "mark": {
+                "layout": "stack"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "category_name",
+                  "axis": {
+                    "hideTitle": true,
+                    "labelAngle": 45
+                  },
+                  "displayName": "Categoría",
+                  "scale": {
+                    "categorySize": {
+                      "number": 15,
+                      "type": "number-of-categories"
+                    },
+                    "type": "categorical",
+                    "sort": {
+                      "by": "measure-reversed",
+                      "measure": {
+                        "fieldName": "measure(lineas)"
+                      }
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(lineas)",
+                  "axis": {
+                    "title": "Líneas"
+                  },
+                  "displayName": "Líneas",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "customer_segment",
+                  "legend": {
+                    "title": "Segmento de cliente"
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 17,
+            "width": 12,
+            "height": 7
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "global_filters",
+      "displayName": "Global Filters",
+      "layout": [
+        {
+          "widget": {
+            "name": "filtro_segmento",
+            "queries": [
+              {
+                "name": "dashboards/01f1e6a50ed01f4da71ec197bae332f9/datasets/01f1e6a599811547a6742f4f7dde3761_customer_segment",
+                "query": {
+                  "datasetName": "retrasos_categoria_segmento",
+                  "fields": [
+                    {
+                      "name": "customer_segment",
+                      "expression": "`customer_segment`"
+                    },
+                    {
+                      "name": "customer_segment_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "scale": {
+                "sort": {
+                  "by": "natural-order"
+                },
+                "type": "categorical"
+              },
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Segmento de cliente"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "customer_segment",
+                    "queryName": "dashboards/01f1e6a50ed01f4da71ec197bae332f9/datasets/01f1e6a599811547a6742f4f7dde3761_customer_segment"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filtro_categoria",
+            "queries": [
+              {
+                "name": "dashboards/01f1e6a50ed01f4da71ec197bae332f9/datasets/01f1e6a599811547a6742f4f7dde3761_category_name",
+                "query": {
+                  "datasetName": "retrasos_categoria_segmento",
+                  "fields": [
+                    {
+                      "name": "category_name",
+                      "expression": "`category_name`"
+                    },
+                    {
+                      "name": "category_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "scale": {
+                "sort": {
+                  "by": "natural-order"
+                },
+                "type": "categorical"
+              },
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Categoría"
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "category_name",
+                    "queryName": "dashboards/01f1e6a50ed01f4da71ec197bae332f9/datasets/01f1e6a599811547a6742f4f7dde3761_category_name"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filtro_min_lineas",
+            "queries": [
+              {
+                "name": "dashboards/01f1e6a50ed01f4da71ec197bae332f9/datasets/01f1e6a599a81fad8ebbd707ac7d28da_valor_umbral",
+                "query": {
+                  "datasetName": "umbral_opciones",
+                  "fields": [
+                    {
+                      "name": "valor_umbral",
+                      "expression": "`valor_umbral`"
+                    },
+                    {
+                      "name": "valor_umbral_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "parameter_dashboards/01f1e6a50ed01f4da71ec197bae332f9/datasets/01f1e6a599811547a6742f4f7dde3761_min_lineas",
+                "query": {
+                  "datasetName": "retrasos_categoria_segmento",
+                  "parameters": [
+                    {
+                      "name": "min_lineas",
+                      "keyword": "min_lineas"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Mínimo de líneas"
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "valor_umbral",
+                    "queryName": "dashboards/01f1e6a50ed01f4da71ec197bae332f9/datasets/01f1e6a599a81fad8ebbd707ac7d28da_valor_umbral"
+                  },
+                  {
+                    "parameterName": "min_lineas",
+                    "queryName": "parameter_dashboards/01f1e6a50ed01f4da71ec197bae332f9/datasets/01f1e6a599811547a6742f4f7dde3761_min_lineas"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "ranking_brechas",
+      "displayName": "Ranking y brechas",
+      "layout": [
+        {
+          "widget": {
+            "name": "cabecera_ranking",
+            "spec": {
+              "verticalAlign": "center",
+              "version": 1,
+              "widgetType": "text",
+              "encodings": {
+                "text": {
+                  "fields": [],
+                  "lines": [
+                    "## Ranking y brechas\n",
+                    "Las 10 categorías con mayor y menor porcentaje de líneas tardías, la brecha de cada segmento frente a la media global del conjunto filtrado (en puntos porcentuales) y el detalle por categoría y segmento. Todos los porcentajes se calculan como suma de líneas tardías entre suma de líneas, nunca como media de porcentajes."
+                  ]
+                }
+              }
+            },
+            "specExtensions": {
+              "widgetBackgroundColor": {
+                "light": "#FFF8EE",
+                "dark": "#221E1A"
+              },
+              "widgetBorderColor": {
+                "light": "#FFF8EE",
+                "dark": "#221E1A"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "top10_tardias",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "retrasos_categoria_segmento",
+                  "fields": [
+                    {
+                      "name": "measure(pct_tardias)",
+                      "expression": "MEASURE(`pct_tardias`)"
+                    },
+                    {
+                      "name": "category_name",
+                      "expression": "`category_name`"
+                    }
+                  ],
+                  "disaggregated": false,
+                  "orders": [
+                    {
+                      "direction": "DESC",
+                      "expression": "MEASURE(`pct_tardias`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "showTitle": true,
+                "title": "Golf Bags & Carts y Lacrosse concentran el mayor % de líneas tardías",
+                "description": {
+                  "value": "Porcentaje de líneas tardías agregado por categoría: suma de líneas tardías entre suma de líneas, sobre el conjunto filtrado.",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "measure(pct_tardias)",
+                  "axis": {
+                    "title": "% de líneas tardías"
+                  },
+                  "displayName": "% de líneas tardías",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "category_name",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Categoría",
+                  "scale": {
+                    "categorySize": {
+                      "number": 10,
+                      "type": "number-of-categories"
+                    },
+                    "type": "categorical",
+                    "sort": {
+                      "by": "measure-reversed",
+                      "measure": {
+                        "fieldName": "measure(pct_tardias)"
+                      }
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "measure(pct_tardias)",
+                  "scale": {
+                    "colorRamp": {
+                      "colors": {
+                        "end": "#C2410C",
+                        "start": "#FFE9CC"
+                      },
+                      "mode": "custom-sequential"
+                    },
+                    "type": "quantitative"
+                  }
+                },
+                "label": {
+                  "display": {
+                    "type": "all"
+                  },
+                  "show": true,
+                  "text": {
+                    "fieldName": "measure(pct_tardias)",
+                    "format": {
+                      "decimalPlaces": {
+                        "places": 1,
+                        "type": "exact"
+                      },
+                      "type": "number-percent"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 6,
+            "height": 9
+          }
+        },
+        {
+          "widget": {
+            "name": "bottom10_tardias",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "retrasos_categoria_segmento",
+                  "fields": [
+                    {
+                      "name": "measure(pct_tardias)",
+                      "expression": "MEASURE(`pct_tardias`)"
+                    },
+                    {
+                      "name": "category_name",
+                      "expression": "`category_name`"
+                    }
+                  ],
+                  "disaggregated": false,
+                  "orders": [
+                    {
+                      "direction": "ASC",
+                      "expression": "MEASURE(`pct_tardias`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "showTitle": true,
+                "title": "Men's Golf Clubs y Basketball son las categorías más puntuales en entregas",
+                "description": {
+                  "value": "Las categorías con menor porcentaje de líneas con entrega tardía del conjunto filtrado.",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "measure(pct_tardias)",
+                  "axis": {
+                    "title": "% de líneas tardías"
+                  },
+                  "displayName": "% de líneas tardías",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "category_name",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Categoría",
+                  "scale": {
+                    "categorySize": {
+                      "number": 10,
+                      "type": "number-of-categories"
+                    },
+                    "type": "categorical",
+                    "sort": {
+                      "by": "measure",
+                      "measure": {
+                        "fieldName": "measure(pct_tardias)"
+                      }
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "measure(pct_tardias)",
+                  "scale": {
+                    "colorRamp": {
+                      "colors": {
+                        "end": "#0F766E",
+                        "start": "#0F766E"
+                      },
+                      "mode": "custom-sequential"
+                    },
+                    "type": "quantitative"
+                  }
+                },
+                "label": {
+                  "display": {
+                    "type": "all"
+                  },
+                  "show": true,
+                  "text": {
+                    "fieldName": "measure(pct_tardias)",
+                    "format": {
+                      "decimalPlaces": {
+                        "places": 1,
+                        "type": "exact"
+                      },
+                      "type": "number-percent"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 6,
+            "height": 9
+          }
+        },
+        {
+          "widget": {
+            "name": "brecha_segmento",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "retrasos_categoria_segmento",
+                  "fields": [
+                    {
+                      "name": "measure(brecha_vs_global)",
+                      "expression": "MEASURE(`brecha_vs_global`)"
+                    },
+                    {
+                      "name": "customer_segment",
+                      "expression": "`customer_segment`"
+                    }
+                  ],
+                  "disaggregated": false,
+                  "orders": [
+                    {
+                      "direction": "DESC",
+                      "expression": "MEASURE(`brecha_vs_global`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "showTitle": true,
+                "title": "Home Office y Consumer retrasan por encima de la media; Corporate, por debajo",
+                "description": {
+                  "value": "Porcentaje de líneas tardías de cada segmento menos el porcentaje global del conjunto filtrado, en puntos porcentuales. Positivo (naranja): retrasa más que la media; negativo (verde azulado): retrasa menos.",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "measure(brecha_vs_global)",
+                  "axis": {
+                    "title": "Brecha vs media global (p.p.)"
+                  },
+                  "displayName": "Brecha (p.p.)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "customer_segment",
+                  "axis": {
+                    "hideTitle": true
+                  },
+                  "displayName": "Segmento de cliente",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "measure-reversed",
+                      "measure": {
+                        "fieldName": "measure(brecha_vs_global)"
+                      }
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "measure(brecha_vs_global)",
+                  "scale": {
+                    "colorRamp": {
+                      "colors": {
+                        "end": "#C2410C",
+                        "mid": "#E7E5E4",
+                        "start": "#0F766E"
+                      },
+                      "mode": "custom-diverging"
+                    },
+                    "type": "quantitative"
+                  }
+                },
+                "label": {
+                  "display": {
+                    "type": "all"
+                  },
+                  "show": true,
+                  "text": {
+                    "fieldName": "measure(brecha_vs_global)",
+                    "format": {
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "places": 1,
+                        "type": "exact"
+                      },
+                      "type": "number-plain"
+                    },
+                    "formatTemplate": "{{ @formatted }} p.p."
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 12,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "tabla_detalle",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "retrasos_categoria_segmento",
+                  "fields": [
+                    {
+                      "name": "category_name",
+                      "expression": "`category_name`"
+                    },
+                    {
+                      "name": "customer_segment",
+                      "expression": "`customer_segment`"
+                    },
+                    {
+                      "name": "measure(lineas)",
+                      "expression": "MEASURE(`lineas`)"
+                    },
+                    {
+                      "name": "measure(lineas_tardias)",
+                      "expression": "MEASURE(`lineas_tardias`)"
+                    },
+                    {
+                      "name": "measure(pct_tardias)",
+                      "expression": "MEASURE(`pct_tardias`)"
+                    }
+                  ],
+                  "disaggregated": false,
+                  "orders": [
+                    {
+                      "direction": "DESC",
+                      "expression": "MEASURE(`pct_tardias`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Detalle por categoría y segmento"
+              },
+              "bandedRows": {
+                "enabled": true
+              },
+              "rowsPerPage": 15,
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "category_name",
+                    "headerAlignment": "left"
+                  },
+                  {
+                    "fieldName": "customer_segment",
+                    "headerAlignment": "left"
+                  },
+                  {
+                    "fieldName": "measure(lineas)",
+                    "format": {
+                      "abbreviation": "none",
+                      "type": "number-plain"
+                    },
+                    "headerAlignment": "right"
+                  },
+                  {
+                    "fieldName": "measure(lineas_tardias)",
+                    "format": {
+                      "abbreviation": "none",
+                      "type": "number-plain"
+                    },
+                    "headerAlignment": "right"
+                  },
+                  {
+                    "fieldName": "measure(pct_tardias)",
+                    "format": {
+                      "decimalPlaces": {
+                        "places": 1,
+                        "type": "exact"
+                      },
+                      "type": "number-percent"
+                    },
+                    "headerAlignment": "right",
+                    "style": {
+                      "rules": [
+                        {
+                          "backgroundColor": "#FDE8D8",
+                          "condition": {
+                            "operand": {
+                              "type": "data-value",
+                              "value": "0.65"
+                            },
+                            "operator": ">=",
+                            "fieldName": "measure(pct_tardias)"
+                          },
+                          "fontWeight": 600,
+                          "foreground": "#C2410C"
+                        },
+                        {
+                          "backgroundColor": "#DDEEE9",
+                          "condition": {
+                            "operand": {
+                              "type": "data-value",
+                              "value": "0.5"
+                            },
+                            "operator": "<=",
+                            "fieldName": "measure(pct_tardias)"
+                          },
+                          "foreground": "#0F766E"
+                        }
+                      ],
+                      "type": "basic"
+                    }
+                  }
+                ],
+                "rowOrder": [
+                  {
+                    "by": "column-reversed",
+                    "field": {
+                      "index": 4
+                    }
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 16,
+            "width": 12,
+            "height": 10
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {
+        "light": "#FFF8EE",
+        "dark": "#221E1A"
+      },
+      "widgetBackgroundColor": {
+        "light": "#FFFFFF",
+        "dark": "#2A241F"
+      },
+      "widgetBorderColor": {
+        "light": "#F3E7D3",
+        "dark": "#2A241F"
+      },
+      "selectionColor": {
+        "light": "#C2410C",
+        "dark": "#E8762C"
+      },
+      "visualizationColors": [
+        "#0F766E",
+        "#334155",
+        "#B45309"
+      ],
+      "widgetHeaderAlignment": "LEFT",
+      "widgetPadding": 12,
+      "widgetMargin": 4,
+      "widgetCornerRadius": 8,
+      "widgetShadow": 5,
+      "continuousGradient": {
+        "lightMode": {
+          "customSequential": {
+            "start": "#FFE9CC",
+            "end": "#C2410C"
+          }
+        },
+        "darkMode": {
+          "customSequential": {
+            "start": "#3F3325",
+            "end": "#E8762C"
+          }
+        }
+      },
+      "fontSettings": {
+        "base": {
+          "fontFamily": "Lato",
+          "fontColor": {
+            "light": "#1C1917",
+            "dark": "#F2EDE4"
+          }
+        },
+        "widgetTitle": {
+          "fontFamily": "Lato",
+          "fontColor": {
+            "light": "#1C1917",
+            "dark": "#F2EDE4"
+          },
+          "fontWeight": 600
+        },
+        "widgetDescription": {
+          "fontFamily": "Lato",
+          "fontColor": {
+            "light": "#78716C",
+            "dark": "#B8AFA2"
+          }
+        },
+        "fieldTitle": {
+          "fontFamily": "Lato",
+          "fontColor": {
+            "light": "#1C1917",
+            "dark": "#F2EDE4"
+          }
+        },
+        "fieldValue": {
+          "fontFamily": "Lato",
+          "fontColor": {
+            "light": "#1C1917",
+            "dark": "#F2EDE4"
+          }
+        }
+      },
+      "gridLineColor": {
+        "light": "#F0E6D2",
+        "dark": "#3A342D"
+      },
+      "axisLineColor": {
+        "light": "#D9C9AF",
+        "dark": "#4A423A"
+      }
+    },
+    "applyModeEnabled": false
+  }
+}

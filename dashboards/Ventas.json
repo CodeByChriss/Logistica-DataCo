@@ -1,0 +1,766 @@
+{
+  "datasets": [
+    {
+      "name": "ventas_mensuales",
+      "displayName": "Ventas mensuales",
+      "config": {
+        "source": "SELECT mes, pedidos, unidades, ventas_netas, descuentos, beneficio,\n       LAG(ventas_netas) OVER (ORDER BY mes) AS ventas_netas_prev\nFROM logistica_dataco.gold.mart_ventas_mensuales",
+        "measures": [
+          {
+            "name": "ventas_netas",
+            "expr": "SUM(ventas_netas)",
+            "format": {
+              "type": "currency",
+              "currencyCode": "EUR",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          },
+          {
+            "name": "pedidos",
+            "expr": "SUM(pedidos)"
+          },
+          {
+            "name": "unidades",
+            "expr": "SUM(unidades)"
+          },
+          {
+            "name": "descuentos",
+            "expr": "SUM(descuentos)",
+            "format": {
+              "type": "currency",
+              "currencyCode": "EUR",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          },
+          {
+            "name": "beneficio",
+            "expr": "SUM(beneficio)",
+            "format": {
+              "type": "currency",
+              "currencyCode": "EUR",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 0.0
+              }
+            }
+          },
+          {
+            "name": "margen",
+            "expr": "SUM(beneficio) / NULLIF(SUM(ventas_netas), 0)",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "ticket_medio",
+            "expr": "SUM(ventas_netas) / NULLIF(SUM(pedidos), 0)",
+            "format": {
+              "type": "currency",
+              "currencyCode": "EUR",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 2.0
+              }
+            }
+          },
+          {
+            "name": "descuentos_sobre_ventas",
+            "expr": "SUM(descuentos) / NULLIF(SUM(ventas_netas), 0)",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          }
+        ],
+        "version": "1.1",
+        "comment": "Ventas mensuales por mes de pedido (excluye cancelados). Margen, ticket medio y descuentos como ratios; variación mensual respecto al mes anterior.",
+        "dimensions": [
+          {
+            "expr": "mes",
+            "format": {
+              "type": "date",
+              "dateFormat": "locale_short_month"
+            }
+          },
+          {
+            "name": "anio",
+            "expr": "YEAR(mes)"
+          },
+          {
+            "name": "variacion_ventas",
+            "expr": "(source.ventas_netas - source.ventas_netas_prev) / NULLIF(source.ventas_netas_prev, 0)",
+            "comment": "Variación de ventas netas respecto al mes anterior",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "tendencia",
+            "expr": "CASE WHEN source.ventas_netas >= source.ventas_netas_prev THEN 'Alza' ELSE 'Baja' END"
+          }
+        ]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "name": "6e446f43",
+      "displayName": "Ventas",
+      "layout": [
+        {
+          "widget": {
+            "name": "filtro_mes",
+            "queries": [
+              {
+                "name": "dashboards/01f1e6a4eae115f7aae15a45d58a706d/datasets/01f1e6a544311b419c98ede27b996f4c_mes",
+                "query": {
+                  "datasetName": "ventas_mensuales",
+                  "fields": [
+                    {
+                      "name": "mes",
+                      "expression": "`mes`"
+                    },
+                    {
+                      "name": "mes_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Mes"
+              },
+              "widgetType": "filter-date-range-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "mes",
+                    "queryName": "dashboards/01f1e6a4eae115f7aae15a45d58a706d/datasets/01f1e6a544311b419c98ede27b996f4c_mes"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "filtro_anio",
+            "queries": [
+              {
+                "name": "dashboards/01f1e6a4eae115f7aae15a45d58a706d/datasets/01f1e6a544311b419c98ede27b996f4c_anio",
+                "query": {
+                  "datasetName": "ventas_mensuales",
+                  "fields": [
+                    {
+                      "name": "anio",
+                      "expression": "`anio`"
+                    },
+                    {
+                      "name": "anio_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": "Año"
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "anio",
+                    "queryName": "dashboards/01f1e6a4eae115f7aae15a45d58a706d/datasets/01f1e6a544311b419c98ede27b996f4c_anio"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_ventas_netas",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ventas_mensuales",
+                  "fields": [
+                    {
+                      "name": "measure(ventas_netas)",
+                      "expression": "MEASURE(`ventas_netas`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Ventas netas"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(ventas_netas)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 6,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_beneficio",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ventas_mensuales",
+                  "fields": [
+                    {
+                      "name": "measure(beneficio)",
+                      "expression": "MEASURE(`beneficio`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Beneficio"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(beneficio)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 3,
+            "width": 6,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_margen",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ventas_mensuales",
+                  "fields": [
+                    {
+                      "name": "measure(margen)",
+                      "expression": "MEASURE(`margen`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Margen (%)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(margen)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_ticket_medio",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ventas_mensuales",
+                  "fields": [
+                    {
+                      "name": "measure(ticket_medio)",
+                      "expression": "MEASURE(`ticket_medio`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Ticket medio"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(ticket_medio)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "linea_ventas",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ventas_mensuales",
+                  "fields": [
+                    {
+                      "name": "monthly(mes)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `mes`)"
+                    },
+                    {
+                      "name": "measure(ventas_netas)",
+                      "expression": "MEASURE(`ventas_netas`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Ventas netas por mes",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(mes)",
+                  "displayName": "Mes",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(ventas_netas)",
+                  "displayName": "Ventas netas (€)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 12,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "barras_beneficio",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ventas_mensuales",
+                  "fields": [
+                    {
+                      "name": "monthly(mes)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `mes`)"
+                    },
+                    {
+                      "name": "measure(beneficio)",
+                      "expression": "MEASURE(`beneficio`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Beneficio por mes",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(mes)",
+                  "displayName": "Mes",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(beneficio)",
+                  "displayName": "Beneficio (€)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 12,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "barras_variacion",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ventas_mensuales",
+                  "fields": [
+                    {
+                      "name": "tendencia",
+                      "expression": "`tendencia`"
+                    },
+                    {
+                      "name": "monthly(mes)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `mes`)"
+                    },
+                    {
+                      "name": "avg(variacion_ventas)",
+                      "expression": "AVG(`variacion_ventas`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Variación mensual de ventas (%)",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(mes)",
+                  "displayName": "Mes",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(variacion_ventas)",
+                  "displayName": "Variación (%)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "tendencia",
+                  "displayName": "tendencia",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 16,
+            "width": 12,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "tabla_detalle",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ventas_mensuales",
+                  "fields": [
+                    {
+                      "name": "mes",
+                      "expression": "`mes`"
+                    },
+                    {
+                      "name": "measure(pedidos)",
+                      "expression": "MEASURE(`pedidos`)"
+                    },
+                    {
+                      "name": "measure(unidades)",
+                      "expression": "MEASURE(`unidades`)"
+                    },
+                    {
+                      "name": "measure(ventas_netas)",
+                      "expression": "MEASURE(`ventas_netas`)"
+                    },
+                    {
+                      "name": "measure(beneficio)",
+                      "expression": "MEASURE(`beneficio`)"
+                    },
+                    {
+                      "name": "measure(margen)",
+                      "expression": "MEASURE(`margen`)"
+                    }
+                  ],
+                  "disaggregated": false,
+                  "orders": [
+                    {
+                      "direction": "DESC",
+                      "expression": "`mes`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Detalle mensual",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "mes"
+                  },
+                  {
+                    "fieldName": "measure(pedidos)"
+                  },
+                  {
+                    "fieldName": "measure(unidades)"
+                  },
+                  {
+                    "fieldName": "measure(ventas_netas)"
+                  },
+                  {
+                    "fieldName": "measure(beneficio)"
+                  },
+                  {
+                    "fieldName": "measure(margen)"
+                  }
+                ],
+                "rowOrder": [
+                  {
+                    "by": "column-reversed",
+                    "field": {
+                      "index": 0
+                    }
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 21,
+            "width": 12,
+            "height": 7
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {
+        "light": "#FAFAF9",
+        "dark": "#16181D"
+      },
+      "widgetBackgroundColor": {
+        "light": "#FFFFFF",
+        "dark": "#1E2229"
+      },
+      "widgetBorderColor": {
+        "light": "#FFFFFF",
+        "dark": "#1E2229"
+      },
+      "selectionColor": {
+        "light": "#1F3A5F",
+        "dark": "#4C7BA8"
+      },
+      "visualizationColors": [
+        "#1F3A5F",
+        "#9CA3AF",
+        "#6B7280",
+        "#B8C4D6",
+        "#5A7A9F"
+      ],
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED",
+      "widgetCornerRadius": 8,
+      "widgetShadow": 0,
+      "fontSettings": {
+        "base": {
+          "fontFamily": "Inter",
+          "fontColor": {
+            "light": "#1F2937",
+            "dark": "#E5E7EB"
+          },
+          "fontSize": 14
+        },
+        "widgetTitle": {
+          "fontFamily": "Inter",
+          "fontColor": {
+            "light": "#6B7280",
+            "dark": "#9CA3AF"
+          },
+          "fontSize": 13,
+          "fontWeight": 500
+        },
+        "fieldTitle": {
+          "fontFamily": "Inter",
+          "fontColor": {
+            "light": "#6B7280",
+            "dark": "#9CA3AF"
+          },
+          "fontSize": 12
+        },
+        "fieldValue": {
+          "fontFamily": "Inter",
+          "fontColor": {
+            "light": "#1F2937",
+            "dark": "#E5E7EB"
+          },
+          "fontSize": 12
+        }
+      },
+      "gridLineColor": {
+        "light": "#F1F1EF",
+        "dark": "#2A2F38"
+      },
+      "visualizationColorMappings": [
+        {
+          "value": "Alza",
+          "color": "#1F3A5F"
+        },
+        {
+          "value": "Baja",
+          "color": "#9CA3AF"
+        }
+      ]
+    },
+    "applyModeEnabled": false
+  }
+}

@@ -1,0 +1,1259 @@
+{
+  "datasets": [
+    {
+      "name": "entregas_logistica",
+      "displayName": "Entregas logísticas",
+      "config": {
+        "source": "logistica_dataco.gold.mart_entregas_modo_region",
+        "measures": [
+          {
+            "name": "pedidos",
+            "expr": "SUM(pedidos)"
+          },
+          {
+            "name": "lineas",
+            "expr": "SUM(lineas)"
+          },
+          {
+            "name": "lineas_tardias",
+            "expr": "SUM(lineas_tardias)"
+          },
+          {
+            "name": "pct_tardias",
+            "expr": "SUM(lineas_tardias) / SUM(lineas)",
+            "comment": "Ratio 0-1 de líneas tardías sobre total de líneas, agregado como suma sobre suma.",
+            "format": {
+              "type": "percentage",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "dias_reales_medios",
+            "expr": "SUM(dias_envio_real_medio * lineas) / SUM(lineas)",
+            "comment": "Media ponderada por líneas de los días reales de envío.",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "dias_previstos_medios",
+            "expr": "SUM(dias_envio_previsto_medio * lineas) / SUM(lineas)",
+            "comment": "Media ponderada por líneas de los días previstos de envío.",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          },
+          {
+            "name": "desviacion_dias",
+            "expr": "MEASURE(`dias_reales_medios`) - MEASURE(`dias_previstos_medios`)",
+            "comment": "Días reales medios menos días previstos medios; positivo significa entregas más lentas de lo previsto.",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          }
+        ],
+        "version": "1.1",
+        "comment": "Entregas y retrasos por modo de envío y región de destino (excluye cancelados). Medias de días ponderadas por líneas; nunca promediar pct_tardias ni los *_medio de origen.",
+        "dimensions": [
+          {
+            "expr": "shipping_mode"
+          },
+          {
+            "expr": "order_region"
+          }
+        ]
+      }
+    },
+    {
+      "name": "entregas_dias_previsto_real",
+      "displayName": "Días de envío: previsto vs real",
+      "config": {
+        "source": "SELECT shipping_mode, order_region, 'Previsto' AS tipo, dias_envio_previsto_medio AS dias, lineas FROM logistica_dataco.gold.mart_entregas_modo_region UNION ALL SELECT shipping_mode, order_region, 'Real' AS tipo, dias_envio_real_medio AS dias, lineas FROM logistica_dataco.gold.mart_entregas_modo_region",
+        "measures": [
+          {
+            "name": "dias_medios",
+            "expr": "SUM(dias * lineas) / SUM(lineas)",
+            "comment": "Media ponderada por líneas de los días de envío (previstos o reales según tipo).",
+            "format": {
+              "type": "number",
+              "decimalPlaces": {
+                "type": "exact",
+                "places": 1.0
+              }
+            }
+          }
+        ],
+        "version": "1.1",
+        "comment": "Despliegue en filas (Previsto/Real) de los días de envío medios ponderados por líneas, para comparar previsto vs real por modo de envío en barras agrupadas.",
+        "dimensions": [
+          {
+            "expr": "shipping_mode"
+          },
+          {
+            "expr": "order_region"
+          },
+          {
+            "expr": "tipo"
+          }
+        ]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "name": "e27fa8db",
+      "displayName": "Visión global",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_pedidos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "entregas_logistica",
+                  "fields": [
+                    {
+                      "name": "measure(pedidos)",
+                      "expression": "MEASURE(`pedidos`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Pedidos"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(pedidos)",
+                  "format": {
+                    "abbreviation": "none",
+                    "type": "number-plain"
+                  },
+                  "style": {
+                    "fontSize": 34,
+                    "fontWeight": 700,
+                    "foreground": "#22D3EE"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_pct_tardias",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "entregas_logistica",
+                  "fields": [
+                    {
+                      "name": "measure(pct_tardias)",
+                      "expression": "MEASURE(`pct_tardias`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "% tardías"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(pct_tardias)",
+                  "format": {
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "exact"
+                    },
+                    "type": "number-percent"
+                  },
+                  "style": {
+                    "fontSize": 34,
+                    "fontWeight": 700,
+                    "foreground": "#F43F5E"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_dias_reales",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "entregas_logistica",
+                  "fields": [
+                    {
+                      "name": "measure(dias_reales_medios)",
+                      "expression": "MEASURE(`dias_reales_medios`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Días reales medios"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(dias_reales_medios)",
+                  "format": {
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "exact"
+                    },
+                    "type": "number-plain"
+                  },
+                  "style": {
+                    "fontSize": 34,
+                    "fontWeight": 700,
+                    "foreground": "#22D3EE"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_desviacion",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "entregas_logistica",
+                  "fields": [
+                    {
+                      "name": "measure(desviacion_dias)",
+                      "expression": "MEASURE(`desviacion_dias`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Desviación vs previsto"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "measure(desviacion_dias)",
+                  "format": {
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "exact"
+                    },
+                    "type": "number-plain"
+                  },
+                  "formatTemplate": "{{ @formatted }} días",
+                  "style": {
+                    "fontSize": 34,
+                    "fontWeight": 700,
+                    "foreground": "#22D3EE",
+                    "rules": [
+                      {
+                        "condition": {
+                          "operand": {
+                            "type": "data-value",
+                            "value": "0"
+                          },
+                          "operator": ">"
+                        },
+                        "foreground": "#F43F5E"
+                      }
+                    ]
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 0,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "pct_tardias_modo",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "entregas_logistica",
+                  "fields": [
+                    {
+                      "name": "measure(pct_tardias)",
+                      "expression": "MEASURE(`pct_tardias`)"
+                    },
+                    {
+                      "name": "shipping_mode",
+                      "expression": "`shipping_mode`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "% tardías por modo"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#F43F5E"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "measure(pct_tardias)",
+                  "format": {
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "exact"
+                    },
+                    "type": "number-percent"
+                  },
+                  "displayName": "% tardías",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "shipping_mode",
+                  "displayName": "Modo de envío",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                },
+                "label": {
+                  "display": {
+                    "type": "all"
+                  },
+                  "show": true,
+                  "text": {
+                    "fieldName": "measure(pct_tardias)",
+                    "format": {
+                      "decimalPlaces": {
+                        "places": 1,
+                        "type": "exact"
+                      },
+                      "type": "number-percent"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "top10_regiones_tardias",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "entregas_logistica",
+                  "fields": [
+                    {
+                      "name": "measure(pct_tardias)",
+                      "expression": "MEASURE(`pct_tardias`)"
+                    },
+                    {
+                      "name": "order_region",
+                      "expression": "`order_region`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Top 10 regiones por % tardías"
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#F43F5E"
+                ]
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "measure(pct_tardias)",
+                  "format": {
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "exact"
+                    },
+                    "type": "number-percent"
+                  },
+                  "displayName": "% tardías",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "order_region",
+                  "displayName": "Región",
+                  "scale": {
+                    "categorySize": {
+                      "number": 10,
+                      "type": "number-of-categories"
+                    },
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  }
+                },
+                "label": {
+                  "display": {
+                    "type": "all"
+                  },
+                  "show": true,
+                  "text": {
+                    "fieldName": "measure(pct_tardias)",
+                    "format": {
+                      "decimalPlaces": {
+                        "places": 1,
+                        "type": "exact"
+                      },
+                      "type": "number-percent"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 3,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "previsto_vs_real_modo",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "entregas_dias_previsto_real",
+                  "fields": [
+                    {
+                      "name": "tipo",
+                      "expression": "`tipo`"
+                    },
+                    {
+                      "name": "shipping_mode",
+                      "expression": "`shipping_mode`"
+                    },
+                    {
+                      "name": "measure(dias_medios)",
+                      "expression": "MEASURE(`dias_medios`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Previsto vs real por modo"
+              },
+              "version": 3,
+              "mark": {
+                "layout": "group"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "shipping_mode",
+                  "displayName": "Modo de envío",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(dias_medios)",
+                  "format": {
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "exact"
+                    },
+                    "type": "number-plain"
+                  },
+                  "displayName": "Días",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "tipo",
+                  "legend": {
+                    "hide": false,
+                    "position": "top"
+                  },
+                  "scale": {
+                    "mappings": [
+                      {
+                        "color": "#F59E0B",
+                        "value": "Previsto"
+                      },
+                      {
+                        "color": "#22D3EE",
+                        "value": "Real"
+                      }
+                    ],
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 12,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "global_filters",
+      "displayName": "Global Filters",
+      "layout": [
+        {
+          "widget": {
+            "name": "filtro_modo_envio",
+            "queries": [
+              {
+                "name": "dashboards/01f1e6a32d071d51b7257c8343c008b5/datasets/01f1e6a42f6e1c12ab2b44bb22f6531a_shipping_mode",
+                "query": {
+                  "datasetName": "entregas_logistica",
+                  "fields": [
+                    {
+                      "name": "shipping_mode",
+                      "expression": "`shipping_mode`"
+                    },
+                    {
+                      "name": "shipping_mode_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1e6a32d071d51b7257c8343c008b5/datasets/01f1e6a44cd11f398436469413785237_shipping_mode",
+                "query": {
+                  "datasetName": "entregas_dias_previsto_real",
+                  "fields": [
+                    {
+                      "name": "shipping_mode",
+                      "expression": "`shipping_mode`"
+                    },
+                    {
+                      "name": "shipping_mode_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Modo de envío",
+                  "fields": []
+                }
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "shipping_mode",
+                    "queryName": "dashboards/01f1e6a32d071d51b7257c8343c008b5/datasets/01f1e6a42f6e1c12ab2b44bb22f6531a_shipping_mode"
+                  },
+                  {
+                    "fieldName": "shipping_mode",
+                    "queryName": "dashboards/01f1e6a32d071d51b7257c8343c008b5/datasets/01f1e6a44cd11f398436469413785237_shipping_mode"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "filtro_region",
+            "queries": [
+              {
+                "name": "dashboards/01f1e6a32d071d51b7257c8343c008b5/datasets/01f1e6a42f6e1c12ab2b44bb22f6531a_order_region",
+                "query": {
+                  "datasetName": "entregas_logistica",
+                  "fields": [
+                    {
+                      "name": "order_region",
+                      "expression": "`order_region`"
+                    },
+                    {
+                      "name": "order_region_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1e6a32d071d51b7257c8343c008b5/datasets/01f1e6a44cd11f398436469413785237_order_region",
+                "query": {
+                  "datasetName": "entregas_dias_previsto_real",
+                  "fields": [
+                    {
+                      "name": "order_region",
+                      "expression": "`order_region`"
+                    },
+                    {
+                      "name": "order_region_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Región",
+                  "fields": []
+                }
+              },
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "order_region",
+                    "queryName": "dashboards/01f1e6a32d071d51b7257c8343c008b5/datasets/01f1e6a42f6e1c12ab2b44bb22f6531a_order_region"
+                  },
+                  {
+                    "fieldName": "order_region",
+                    "queryName": "dashboards/01f1e6a32d071d51b7257c8343c008b5/datasets/01f1e6a44cd11f398436469413785237_order_region"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 0,
+            "width": 3,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "detalle_region_modo",
+      "displayName": "Detalle por región y modo",
+      "layout": [
+        {
+          "widget": {
+            "name": "heatmap_tardias",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "entregas_logistica",
+                  "fields": [
+                    {
+                      "name": "measure(pct_tardias)",
+                      "expression": "MEASURE(`pct_tardias`)"
+                    },
+                    {
+                      "name": "shipping_mode",
+                      "expression": "`shipping_mode`"
+                    },
+                    {
+                      "name": "order_region",
+                      "expression": "`order_region`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Mapa de calor: % tardías"
+              },
+              "version": 3,
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "shipping_mode",
+                  "displayName": "Modo de envío",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "order_region",
+                  "displayName": "Región",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "measure(pct_tardias)",
+                  "format": {
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "exact"
+                    },
+                    "type": "number-percent"
+                  },
+                  "legend": {
+                    "hide": false,
+                    "position": "right",
+                    "title": "% tardías"
+                  },
+                  "scale": {
+                    "colorRamp": {
+                      "colors": {
+                        "end": "#F43F5E",
+                        "start": "#164E63"
+                      },
+                      "mode": "custom-sequential"
+                    },
+                    "type": "quantitative"
+                  }
+                },
+                "label": {
+                  "display": {
+                    "type": "all"
+                  },
+                  "show": true,
+                  "text": {
+                    "fieldName": "measure(pct_tardias)",
+                    "format": {
+                      "decimalPlaces": {
+                        "places": 1,
+                        "type": "exact"
+                      },
+                      "type": "number-percent"
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 7,
+            "height": 9
+          }
+        },
+        {
+          "widget": {
+            "name": "scatter_previsto_real",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "entregas_logistica",
+                  "fields": [
+                    {
+                      "name": "shipping_mode",
+                      "expression": "`shipping_mode`"
+                    },
+                    {
+                      "name": "measure(lineas)",
+                      "expression": "MEASURE(`lineas`)"
+                    },
+                    {
+                      "name": "measure(dias_previstos_medios)",
+                      "expression": "MEASURE(`dias_previstos_medios`)"
+                    },
+                    {
+                      "name": "measure(dias_reales_medios)",
+                      "expression": "MEASURE(`dias_reales_medios`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {},
+              "version": 3,
+              "mark": {
+                "colors": [
+                  "#22D3EE"
+                ]
+              },
+              "widgetType": "scatter",
+              "encodings": {
+                "x": {
+                  "fieldName": "measure(dias_previstos_medios)",
+                  "format": {
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "exact"
+                    },
+                    "type": "number-plain"
+                  },
+                  "displayName": "Días previstos medios",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "measure(dias_reales_medios)",
+                  "format": {
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "places": 1,
+                      "type": "exact"
+                    },
+                    "type": "number-plain"
+                  },
+                  "displayName": "Días reales medios",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "shipping_mode",
+                  "legend": {
+                    "hide": false,
+                    "position": "top",
+                    "title": "Modo de envío"
+                  },
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "size": {
+                  "fieldName": "measure(lineas)",
+                  "format": {
+                    "abbreviation": "compact",
+                    "type": "number-plain"
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 7,
+            "y": 0,
+            "width": 5,
+            "height": 9
+          }
+        },
+        {
+          "widget": {
+            "name": "tabla_detalle",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "entregas_logistica",
+                  "fields": [
+                    {
+                      "name": "order_region",
+                      "expression": "`order_region`"
+                    },
+                    {
+                      "name": "shipping_mode",
+                      "expression": "`shipping_mode`"
+                    },
+                    {
+                      "name": "measure(pedidos)",
+                      "expression": "MEASURE(`pedidos`)"
+                    },
+                    {
+                      "name": "measure(lineas)",
+                      "expression": "MEASURE(`lineas`)"
+                    },
+                    {
+                      "name": "measure(pct_tardias)",
+                      "expression": "MEASURE(`pct_tardias`)"
+                    },
+                    {
+                      "name": "measure(dias_reales_medios)",
+                      "expression": "MEASURE(`dias_reales_medios`)"
+                    },
+                    {
+                      "name": "measure(dias_previstos_medios)",
+                      "expression": "MEASURE(`dias_previstos_medios`)"
+                    }
+                  ],
+                  "disaggregated": false,
+                  "orders": [
+                    {
+                      "direction": "DESC",
+                      "expression": "MEASURE(`pct_tardias`)"
+                    },
+                    {
+                      "direction": "ASC",
+                      "expression": "`order_region`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Detalle por región y modo"
+              },
+              "bandedRows": {
+                "backgroundColor": "#16223A",
+                "enabled": true
+              },
+              "displayRowNumbers": false,
+              "rowsPerPage": 15,
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "order_region",
+                    "contentAlignment": "left"
+                  },
+                  {
+                    "fieldName": "shipping_mode"
+                  },
+                  {
+                    "fieldName": "measure(pedidos)",
+                    "contentAlignment": "right",
+                    "format": {
+                      "abbreviation": "none",
+                      "type": "number-plain"
+                    },
+                    "headerAlignment": "right"
+                  },
+                  {
+                    "fieldName": "measure(lineas)",
+                    "contentAlignment": "right",
+                    "format": {
+                      "abbreviation": "none",
+                      "type": "number-plain"
+                    },
+                    "headerAlignment": "right"
+                  },
+                  {
+                    "fieldName": "measure(pct_tardias)",
+                    "contentAlignment": "right",
+                    "format": {
+                      "decimalPlaces": {
+                        "places": 1,
+                        "type": "exact"
+                      },
+                      "type": "number-percent"
+                    },
+                    "headerAlignment": "right",
+                    "style": {
+                      "rules": [
+                        {
+                          "backgroundColor": "#F43F5E",
+                          "bold": true,
+                          "condition": {
+                            "operand": {
+                              "type": "data-value",
+                              "value": "0.75"
+                            },
+                            "operator": ">"
+                          },
+                          "foreground": "#FFFFFF"
+                        },
+                        {
+                          "backgroundColor": "#9F3B5C",
+                          "condition": {
+                            "operand": {
+                              "type": "data-value",
+                              "value": "0.6"
+                            },
+                            "operator": ">"
+                          },
+                          "foreground": "#FFFFFF"
+                        },
+                        {
+                          "backgroundColor": "#5C2A44",
+                          "condition": {
+                            "operand": {
+                              "type": "data-value",
+                              "value": "0.5"
+                            },
+                            "operator": ">"
+                          },
+                          "foreground": "#FECDD6"
+                        }
+                      ],
+                      "type": "basic"
+                    }
+                  },
+                  {
+                    "fieldName": "measure(dias_reales_medios)",
+                    "contentAlignment": "right",
+                    "format": {
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "places": 1,
+                        "type": "exact"
+                      },
+                      "type": "number-plain"
+                    },
+                    "headerAlignment": "right"
+                  },
+                  {
+                    "fieldName": "measure(dias_previstos_medios)",
+                    "contentAlignment": "right",
+                    "format": {
+                      "abbreviation": "none",
+                      "decimalPlaces": {
+                        "places": 1,
+                        "type": "exact"
+                      },
+                      "type": "number-plain"
+                    },
+                    "headerAlignment": "right"
+                  }
+                ],
+                "rowOrder": [
+                  {
+                    "by": "column-reversed",
+                    "field": {
+                      "index": 4
+                    }
+                  },
+                  {
+                    "by": "column",
+                    "field": {
+                      "index": 0
+                    }
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 12,
+            "height": 8
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {
+        "light": "#0B1220",
+        "dark": "#0B1220"
+      },
+      "widgetBackgroundColor": {
+        "light": "#111B2E",
+        "dark": "#111B2E"
+      },
+      "widgetBorderColor": {
+        "light": "#1E2A44",
+        "dark": "#1E2A44"
+      },
+      "selectionColor": {
+        "light": "#22D3EE",
+        "dark": "#22D3EE"
+      },
+      "visualizationColors": [
+        "#22D3EE",
+        "#F43F5E",
+        "#F59E0B",
+        "#818CF8",
+        "#34D399",
+        "#A78BFA"
+      ],
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED",
+      "widgetPadding": 12,
+      "widgetMargin": 8,
+      "widgetCornerRadius": 12,
+      "widgetShadow": 15,
+      "fontSettings": {
+        "base": {
+          "fontFamily": "Inter",
+          "fontColor": {
+            "light": "#E8EEF7",
+            "dark": "#E8EEF7"
+          },
+          "fontSize": 14
+        },
+        "widgetTitle": {
+          "fontFamily": "Space Grotesk",
+          "fontColor": {
+            "light": "#FFFFFF",
+            "dark": "#FFFFFF"
+          },
+          "fontSize": 18,
+          "fontWeight": 700
+        },
+        "fieldTitle": {
+          "fontColor": {
+            "light": "#9FB2CC",
+            "dark": "#9FB2CC"
+          }
+        },
+        "fieldValue": {
+          "fontColor": {
+            "light": "#E8EEF7",
+            "dark": "#E8EEF7"
+          }
+        }
+      },
+      "gridLineColor": {
+        "light": "#22304A",
+        "dark": "#22304A"
+      },
+      "axisLineColor": {
+        "light": "#3B4A66",
+        "dark": "#3B4A66"
+      }
+    },
+    "applyModeEnabled": false
+  }
+}
